@@ -41,6 +41,10 @@
         devShells.default = pkgs.mkShell {
           packages = [
             rust-env
+            pkgs.cargo-show-asm
+            pkgs.cargo-flamegraph
+            pkgs.flamegraph
+            pkgs.pv
           ];
         };
         packages = rec {
