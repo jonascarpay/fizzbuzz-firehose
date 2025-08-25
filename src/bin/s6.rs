@@ -38,8 +38,8 @@ fn main() -> io::Result<()> {
         counter.bump();
         match (i % 3 == 0, i % 5 == 0) {
             (true, true) => buf.write_all(b"FizzBuzz\n")?,
-            (true, false) => buf.write_all(b"Fizz")?,
-            (false, true) => buf.write_all(b"Buzz")?,
+            (true, false) => buf.write_all(b"Fizz\n")?,
+            (false, true) => buf.write_all(b"Buzz\n")?,
             (false, false) => {
                 buf.write_all(counter.view_ascii())?;
                 buf.write_all(b"\n")?;
