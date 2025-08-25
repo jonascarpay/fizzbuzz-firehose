@@ -187,7 +187,7 @@ fn main() -> io::Result<()> {
 }
 ```
 
-Performance: 1.80 GiB/s.
+Performance: 2.09 GiB/s.
 We did it!
 It's not something that will make the global leaderboard, but this is fine for now.
 Our [profile](./flamegraph_s6.svg) shows that right now, we're spending most of our time copying data, which I don't think is easily worked around.
@@ -195,3 +195,29 @@ Our [profile](./flamegraph_s6.svg) shows that right now, we're spending most of 
 Some thoughts:
   - The pattern repeats every 15 iterations
   - We can make a conservative guess about how many times we can write to a buffer
+
+## Step 7: Unrolling the 15-step loop
+
+It's now Monday, and I've been thinking about this.
+If we unroll the loop, we don't need to keep track of the steps anymore.
+Unrolling also allows us to aggregate the counter bumps into one, as well as the writes.
+
+Performance: 2.11 GiB/s.
+No real change.
+Not _too_ surprising, since we didn't get rid of any of the real slow calls, but this was also mostly just so we could do the _next_ big thing.
+
+## Step 8: Aggregating calls
+
+- Combine subsequent known string literal writes into one
+- Combine subsequent counter bumps into one
+- Make the newline a part of the counter buffer
+
+Performance: 2.27 GiB/s.
+Not as much as I'd hoped or expected, to be honest.
+Time for another profile, and see how much time we're spending where.
+
+The [profile](./flamegraph_s8.svg) shows that we're spending _80%_ of our time now copying data.
+The good news is that that means that everything else is pretty fast.
+The bad news is that that is hard to fix.
+
+## Step 9: Custom buffer and tuning
