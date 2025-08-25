@@ -46,6 +46,10 @@ fn main() {
 }
 ```
 
+- TODO: Explain cargo asm, and how to use it to make code more readable.
+- TODO: profile
+- TODO: strace
+
 ## Step 2: Ditching `println`
 
 Let's start by closing the gap with C.
