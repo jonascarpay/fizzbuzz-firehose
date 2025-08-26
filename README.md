@@ -1,14 +1,13 @@
 # fizzbuzz-firehose
 
-Sunday morning programming exercise to see if we can get FizzBuzz to the 1GiB/s mark, without looking at any other solutions.
-Inspired by [this infamous SO thread](https://codegolf.stackexchange.com/questions/215216/high-throughput-fizz-buzz/).
+Sunday morning Rust exercise to see if we can start with a naive FizzBuzz, and then get it to the 1GiB/s mark, without looking at any other solutions.
+Inspired by [this infamous SO thread](https://codegolf.stackexchange.com/questions/215216/high-throughput-fizz-buzz/), but I'm not here to compete, just to see how far I can get by myself.
 
-Performance is measured using `cargo run --release --bin s0 | pv > /dev/null`.
+Throughput is measured using `cargo run --release --bin s0 | pv > /dev/null`.
 
 ## Step 0: Baseline
 
 Naive implementation.
-Performance: 16.7 MiB/s, which is pretty terrible since the equivalent C implementation claims to reach 170 MiB/s.
 
 ```rust
 fn main() {
@@ -28,10 +27,12 @@ fn main() {
 }
 ```
 
+Throughput: 16.7 MiB/s, which is pretty terrible since the baseline C implementation claims to reach 170 MiB/s.
+
 ## Step 1: Cleaning up
 
 If/else chains are ugly.
-This implementation actually produces the exact same ASM, but it looks nicer.
+This implementation actually produces the exact same assembly, but it's much nicer.
 
 ```rust
 fn main() {
@@ -46,22 +47,32 @@ fn main() {
 }
 ```
 
-- TODO: Explain cargo asm, and how to use it to make code more readable.
-- TODO: profile
-- TODO: strace
+Before we continue to step 2, if you permit me, a brief aside on assembly.
+
+### Assembly peeping
+
+Assembly might seem intimidating, but you really don't need to be able to read it for looking at it to be useful.
+Above is a great example, and something that I do all the time: make a change, and see if/how the assembly changes.
+This teaches you a lot about what sort of things get optimized away, but more importantly, it allows you to pick more readable alternatives, confident that you're not sacrificing performance.
+I used to work in HFT, and one of my great frustrations is people writing unmaintainable code because they _think_ it's faster.
+
+Of course there's [Compiler Explorer](https://godbolt.org/), but my recommendation is to get comfortable with the amazing [`cargo-show-asm`](https://github.com/pacak/cargo-show-asm).
+
+Some `cargo-show-asm` tips:
+- Run `cargo-show-asm` in the project root, and then find your function in the list. If it doesn't show up, add `#[inline(never)]`.
+- Rule of thumb: more assembly is almost always worse.
+- Focus on the hot path. The `--rust` flag can help you find it.
+- If you can't read assembly (yet), LLM's are your friend. For example, "These two pieces of assembly are functionally equivalent. Comment on their differences, and the performance implications."
+- Check the `--help`, there are many useful flags for making output more readable.
 
 ## Step 2: Ditching `println`
 
-Let's start by closing the gap with C.
-We're currently 10x slower than C (and it doesn't seem to matter whether we run in debug or release).
-That means `println` is doing a lot more than `printf`.
-Let's start by ditching it and writing to `stdout` directly.
+Let's first aim for closing the gap with C.
+We're currently 10x slower, which can only mean that that `println` is doing a lot more than `printf`.
+I don't know how, but we're here to learn today.
 
-Here's a very naive baseline that's essentially the same thing as the `println` implementation.
-Looking at the assembly, we can see that there's a lot more housekeeping now, but it's too early to analyze in great detail.
+Let's start by ditching `println` and writing to `stdout` ourselves.
 
-Performance: 16.9 MiB/s.
-Not even a blip.
 
 ```rust
 fn main() -> io::Result<()> {
@@ -76,10 +87,19 @@ fn main() -> io::Result<()> {
 }
 ```
 
+Here's a very naive baseline that's essentially the same thing as the `println` implementation.
+There's more assembly code now, but looks like that's mostly because of the more explicit error handling.
+Too early to analyze in great detail.
+
+TODO: talk about the differences
+
+Throughput: 16.9 MiB/s.
+Not even a blip.
+
 ## Step 3: Locking
 
-When writing to `stdout` like we do above, we acquire and release the global `stdout` lock on every write call.
-Let's start by locking once, for the duration of the entire program.
+My understanding is that when we write to `stdout` like we do above, we acquire and release a global `stdout` lock on every write call.
+Let's start by acquiring the lock once, and keep it for the duration of the entire program.
 
 ```rust
 fn main() -> io::Result<()> {
@@ -89,7 +109,7 @@ fn main() -> io::Result<()> {
 }
 ```
 
-Performance: still 16.9 MiB/s.
+Throughput: still 16.9 MiB/s.
 I didn't expect locking to be too significant, but I thought we'd see at least a small bump.
 On to the big one.
 
@@ -97,6 +117,8 @@ On to the big one.
 
 Currently, every time we write we interrupt our program to tell the OS about it.
 Let's stop doing that, and instead write to a buffer.
+
+TODO: show with strace that the number of syscalls has gone down.
 
 ```rust
 fn main() -> io::Result<()> {
@@ -106,24 +128,21 @@ fn main() -> io::Result<()> {
 }
 ```
 
-Performance: 650 MiB/s.
-Gap successfully closed.
+Throughput: 650 MiB/s.
+Gap successfully closed, although I'm a little sad we blew right by it.
+I'd have been interested in seeing what Rust's exact equivalent of the naive C implementation would've looked like.
+Oh well.
 
 ## Status check
 Alright, we've beaten C, but buffering was _the_ low-hanging fruit.
-From now, we'll have to work harder for our gains, and our code will be less idiomatic.
+From now, we'll have to work harder for our gains.
 I can make some guesses about what's holding us back right now, but blindly optimizing things that you _think_ are slow is usually a bad idea.
-Instead, let's get some data.
-We have two methods available to us: profiling, and looking at the assembly.
+Instead, let's get some actual data by profiling our program.
 
 Profiling is an art unto itself.
 You can't measure a program without distorting it, and the smaller and faster the program, the more sensitive to distortion.
 Still, as long as we're careful about interpreting the data, it can't really hurt to have more of it.
 [flamegraph.svg](./flamegraph.svg) shows the result of profiling the above program with `CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --bin s4 > /dev/null`.
-
-Assembly is less intrusive, but also less useful.
-For example, `cargo asm` shows that a lot of our code is dedicated to error handling.
-That suggests that we can speed up our program by optimizing that part, but since the profile doesn't agree, and a more careful reading shows that it's mostly outside the hot loop, let's not let ourselves get distracted quite yet.
 
 Instead, we focus on what both the profiler and assembly suggest is causing us to be slow: serialization.
 `writeln` does a lot of work other than putting bytes in buffers, and right now, we don't want that.
@@ -163,7 +182,7 @@ fn main() -> io::Result<()> {
 }
 ```
 
-Performance: 946 MiB/s.
+Throughput: 946 MiB/s.
 As expected, we were spending a lot of time serializing integers, and now we're not.
 We're on the cusp of the gigabyte mark!
 But, more importantly, now we can start tackling the bigger issue: ditching `writeln`.
@@ -191,7 +210,7 @@ fn main() -> io::Result<()> {
 }
 ```
 
-Performance: 2.09 GiB/s.
+Throughput: 2.09 GiB/s.
 We did it!
 It's not something that will make the global leaderboard, but this is fine for now.
 Our [profile](./flamegraph_s6.svg) shows that right now, we're spending most of our time copying data, which I don't think is easily worked around.
@@ -206,7 +225,7 @@ It's now Monday, and I've been thinking about this.
 If we unroll the loop, we don't need to keep track of the steps anymore.
 Unrolling also allows us to aggregate the counter bumps into one, as well as the writes.
 
-Performance: 2.11 GiB/s.
+Throughput: 2.11 GiB/s.
 No real change.
 Not _too_ surprising, since we didn't get rid of any of the real slow calls, but this was also mostly just so we could do the _next_ big thing.
 
@@ -216,7 +235,7 @@ Not _too_ surprising, since we didn't get rid of any of the real slow calls, but
 - Combine subsequent counter bumps into one
 - Make the newline a part of the counter buffer
 
-Performance: 2.27 GiB/s.
+Throughput: 2.27 GiB/s.
 Not as much as I'd hoped or expected, to be honest.
 Time for another profile, and see how much time we're spending where.
 
