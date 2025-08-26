@@ -1,7 +1,10 @@
 # fizzbuzz-firehose
 
-Sunday morning Rust exercise to see if we can start with a naive FizzBuzz, and then get it to the 1GiB/s mark, without looking at any other solutions.
-Inspired by [this infamous SO thread](https://codegolf.stackexchange.com/questions/215216/high-throughput-fizz-buzz/), but I'm not here to compete, just to see how far I can get by myself.
+Sunday morning Rust exercise:
+see if we can start with a naive FizzBuzz, and then get it to the 1GiB/s mark.
+No looking at any other solutions, or using any crates other than `std`.
+Inspired by [this infamous SO thread](https://codegolf.stackexchange.com/questions/215216/high-throughput-fizz-buzz/).
+I'm not here to compete though, just to see how far I can get by myself.
 
 Throughput is measured using `cargo run --release --bin s0 | pv > /dev/null`.
 
@@ -47,9 +50,9 @@ fn main() {
 }
 ```
 
-Before we continue to step 2, if you permit me, a brief aside on assembly.
-
 ### Assembly peeping
+
+Before we continue to step 2, if you permit me, a brief aside on assembly.
 
 Assembly might seem intimidating, but you really don't need to be able to read it for looking at it to be useful.
 Above is a great example, and something that I do all the time: make a change, and see if/how the assembly changes.
@@ -98,7 +101,7 @@ Not even a blip.
 
 ## Step 3: Locking
 
-My understanding is that when we write to `stdout` like we do above, we acquire and release a global `stdout` lock on every write call.
+My understanding is that when we write to `stdout` like we do above, we acquire and release a global `stdout` lock on every individual write.
 Let's start by acquiring the lock once, and keep it for the duration of the entire program.
 
 ```rust
@@ -151,7 +154,8 @@ One such thing is costing us time, and preventing us from ditching `writeln` alt
 ## Step 5: Serializing integers
 
 This is a fun one.
-Any base-10 math is unnatural for a computer, for example converting arbitrary integers into a decimal format, as we're doing inside our hot loop.
+Any base-10 math is unnatural for a computer.
+For example: converting integers into a decimal format for printing, as we're doing inside our hot loop.
 Fortunately, we can simplify most of it away by recognizing that the number we're printing doesn't really change much between loops.
 Instead, we just store a base 10 representation, and alter that directly.
 
