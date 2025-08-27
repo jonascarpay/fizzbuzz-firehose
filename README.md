@@ -248,3 +248,22 @@ The good news is that that means that everything else is pretty fast.
 The bad news is that that is hard to fix.
 
 ## Step 9: Custom buffer and tuning
+
+Out of desperation more than anything  else
+
+Throughput: 2.70 GiB/s.
+
+## Step 10: What if we only change the things that need to be changed
+
+A thought came to me in the shower: what if we fill a buffer once, and then only change things that need to change?
+If we pick the right buffer size, and we group things by number of digits, we can align things so that the fizzes, buzzes, and fizzbuzzes all stay in the same place.
+Just thinking of all the corner cases makes my head spin a little, but it _should_ work.
+
+Throughput: 3.0 GiB/s
+
+But, we're no longer bound by copying!
+We can optimize further!
+
+## Step 11: Optimizing further
+
+Assembly shows we're not inlining fast_buzz.

@@ -45,6 +45,9 @@
             pkgs.cargo-flamegraph
             pkgs.flamegraph
             pkgs.pv
+            pkgs.python3
+            pkgs.pyright
+            pkgs.ruff
           ];
         };
         packages = rec {
