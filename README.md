@@ -2,9 +2,8 @@
 
 Sunday morning Rust exercise:
 see if we can start with a naive FizzBuzz, and then get it to the 1GiB/s mark.
-No looking at any other solutions, or using any crates other than `std`.
-Inspired by [this infamous SO thread](https://codegolf.stackexchange.com/questions/215216/high-throughput-fizz-buzz/).
-I'm not here to compete though, just to see how far I can get by myself.
+No looking at any other solutions, or using any crates other than the standard library.
+I'm not here to compete on [the global leaderboard](https://codegolf.stackexchange.com/questions/215216/high-throughput-fizz-buzz/), I just want to see how far I can get by myself.
 
 Throughput is measured using `cargo run --release --bin s0 | pv > /dev/null`.
 
@@ -52,15 +51,19 @@ fn main() {
 
 ### Assembly peeping
 
-Before we continue to step 2, if you permit me, a brief aside on assembly.
+Before we continue to step 2, a brief aside on assembly.
 
 Assembly might seem intimidating, but you really don't need to be able to read it for looking at it to be useful.
 Above is a great example, and something that I do all the time: make a change, and see if/how the assembly changes.
-This teaches you a lot about what sort of things get optimized away, but more importantly, it allows you to pick more readable alternatives, confident that you're not sacrificing performance.
-I used to work in HFT, and one of my great frustrations is people writing unmaintainable code because they _think_ it's faster.
+It teaches about what sort of things get optimized away, which is a great skill because it allows you to pick more readable alternatives, confident that you're not sacrificing performance[^manual_opt].
+
+[^manual_opt]:
+    Aside on the aside: I used to work in performance-sensitive environments, and one of my great great frustrations is people blindly hand-optimizing code.
+    It turns out, code that has transparent data flows is easy to understand for both humans and the compiler, and the compiler is better at optimizing than you are.
+    Conversely, if the compiler _doesn't_ optimize something, instead of trying to hand-optimize it yourself, it's usually more productive to find out _why_ the compiler didn't optimize it itself.
+    It usually has a good reason, and understanding it allows you to tackle the root cause.
 
 Of course there's [Compiler Explorer](https://godbolt.org/), but my recommendation is to get comfortable with the amazing [`cargo-show-asm`](https://github.com/pacak/cargo-show-asm).
-
 Some `cargo-show-asm` tips:
 - Run `cargo-show-asm` in the project root, and then find your function in the list. If it doesn't show up, add `#[inline(never)]`.
 - Rule of thumb: more assembly is almost always worse.
@@ -70,12 +73,8 @@ Some `cargo-show-asm` tips:
 
 ## Step 2: Ditching `println`
 
-Let's first aim for closing the gap with C.
-We're currently 10x slower, which can only mean that that `println` is doing a lot more than `printf`.
-I don't know how, but we're here to learn today.
-
+We're currently 10x slower than C, and there's really only one place for slowness to hide: `println` is doing a lot more than `printf`.
 Let's start by ditching `println` and writing to `stdout` ourselves.
-
 
 ```rust
 fn main() -> io::Result<()> {
@@ -91,7 +90,7 @@ fn main() -> io::Result<()> {
 ```
 
 Here's a very naive baseline that's essentially the same thing as the `println` implementation.
-There's more assembly code now, but looks like that's mostly because of the more explicit error handling.
+There's more assembly code now, but that's mostly because of the more explicit error handling.
 Too early to analyze in great detail.
 
 TODO: talk about the differences
