@@ -142,6 +142,8 @@ From now, we'll have to work harder for our gains.
 I can make some guesses about what's holding us back right now, but blindly optimizing things that you _think_ are slow is usually a bad idea.
 Instead, let's get some actual data by profiling our program.
 
+<!-- https://nnethercote.github.io/perf-book/profiling.html -->
+
 Profiling is an art unto itself.
 You can't measure a program without distorting it, and the smaller and faster the program, the more sensitive to distortion.
 Still, as long as we're careful about interpreting the data, it can't really hurt to have more of it.
